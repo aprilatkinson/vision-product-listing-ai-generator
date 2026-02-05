@@ -1,0 +1,32 @@
+model: "gpt-4.1-mini"
+temperature: 0.7
+max_output_tokens: 700
+
+batch:
+  limit: 20
+  sleep_seconds: 0.8
+
+retry:
+  max_attempts: 5
+  base_delay_seconds: 1.0
+  max_delay_seconds: 20.0
+
+quality:
+  min_score: 0.75
+  enforce_title_max_chars: 60
+  enforce_description_word_range: [150, 220]
+  enforce_features_range: [5, 7]
+  enforce_keywords_range: [10, 18]
+
+io:
+  outputs_dir: "outputs"
+  reports_dir: "reports"
+  previews_dir: "outputs/previews"
+  checkpoint_path: "outputs/checkpoint.json"
+  jsonl_path: "outputs/listings.jsonl"
+  json_path: "outputs/listings.json"
+  run_report_path: "reports/run_report.json"
+
+prompt:
+  version: "v1"
+  path: "prompts/v1_product_listing.txt"

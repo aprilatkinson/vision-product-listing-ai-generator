@@ -1,0 +1,26 @@
+[
+  {
+    "product_id": "test-001",
+    "name": "Test Product A",
+    "price": 49.99,
+    "category": "Accessories",
+    "image_path": "product_images/Screenshot 2026-02-05 at 14.30.17.png",
+    "additional_info": "Set A"
+  },
+  {
+    "product_id": "test-002",
+    "name": "Test Product B",
+    "price": 59.99,
+    "category": "Kitchen",
+    "image_path": "product_images/Screenshot 2026-02-05 at 14.30.17.png",
+    "additional_info": "Set B"
+  },
+  {
+    "product_id": "test-003",
+    "name": "Test Product C",
+    "price": 69.99,
+    "category": "Home",
+    "image_path": "product_images/Screenshot 2026-02-05 at 14.30.17.png",
+    "additional_info": "Set C"
+  }
+]
