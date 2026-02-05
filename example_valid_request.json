@@ -1,0 +1,9 @@
+{
+  "product_id": "P001",
+  "product_name": "Stainless Steel Water Bottle",
+  "price": 24.99,
+  "category": "Drinkware",
+  "additional_info": "Keeps drinks cold. Minimal design.",
+  "image_path": "product_images/Screenshot 2026-02-05 at 14.30.17.png",
+  "image_mime": "image/png"
+}

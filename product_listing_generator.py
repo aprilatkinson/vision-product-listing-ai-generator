@@ -258,18 +258,24 @@ def score_listing_quality(listing: Dict[str, Any]) -> float:
 # COST ESTIMATION
 # ---------------------------------------------------
 
-def estimate_cost(usage: Dict[str, Any]) -> float:
+def estimate_cost(usage) -> float:
     """
     Rough cost estimation.
 
-    NOTE:
-    Prices are example estimates for learning purposes.
+    Works with:
+    - dict-like usage: {"input_tokens": x, "output_tokens": y}
+    - OpenAI ResponseUsage object (has attributes input_tokens/output_tokens)
     """
     if not usage:
         return 0.0
 
-    input_tokens = usage.get("input_tokens", 0)
-    output_tokens = usage.get("output_tokens", 0)
+    # If it's a dict, use .get(). If it's an object, use getattr().
+    if isinstance(usage, dict):
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+    else:
+        input_tokens = getattr(usage, "input_tokens", 0)
+        output_tokens = getattr(usage, "output_tokens", 0)
 
     # Example pricing (adjustable)
     input_cost_per_1k = 0.005
@@ -338,11 +344,7 @@ def process_one_product(row: pd.Series) -> Dict[str, Any]:
             cost_estimate = estimate_cost(usage)
             compliance_result = check_compliance(listing)
 
-        if not compliance_result["compliant"]:
-            status = "REVIEW_REQUIRED"
-        else:
-            status = status,
-
+        status = "REVIEW_REQUIRED" if not compliance_result["compliant"] else "OK"
 
         return {
             "product_id": product_id,
@@ -364,6 +366,115 @@ def process_one_product(row: pd.Series) -> Dict[str, Any]:
             "image_path": image_path,
             "status": "FAILED",
             "error": str(e),
+        }
+
+def process_product_request(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Process ONE client JSON request (no pandas required).
+
+    ROLE (M1.06):
+    This lets your system accept structured JSON input (like an API request)
+    and run the same generation pipeline reliably.
+    """
+
+    # Map JSON payload to the same fields your pipeline expects
+    # Expected payload keys (you can align with your Pydantic model):
+    # product_id, product_name, price, category, additional_info (optional),
+    # image_path (optional if still using vision)
+
+    try:
+        product_id = payload["product_id"]
+        image_path = payload["image_path"]
+
+        image_b64 = encode_image_to_base64(image_path)
+
+        prompt = create_product_listing_prompt(
+            product_id=product_id,
+            product_name=payload["product_name"],
+            price=float(payload["price"]),
+            category=payload["category"],
+            additional_info=payload.get("additional_info"),
+        )
+
+        raw_text, usage = generate_listing_with_vision(
+            prompt,
+            image_b64,
+            image_mime=payload.get("image_mime", "image/png"),
+        )
+
+        listing = parse_listing_json(raw_text)
+        compliance_result = check_compliance(listing)
+        quality_score = score_listing_quality(listing)
+        cost_estimate = estimate_cost(usage)
+
+        # Regenerate once if quality low
+        if quality_score < CONFIG["quality"]["min_score"]:
+            improvement_prompt = prompt + """
+The previous output did not meet quality requirements.
+Ensure:
+- At least 5 features
+- At least 10 keywords
+- Description between 150–200 words
+Return ONLY valid JSON.
+"""
+            raw_text, usage = generate_listing_with_vision(
+                improvement_prompt,
+                image_b64,
+                image_mime=payload.get("image_mime", "image/png"),
+            )
+            listing = parse_listing_json(raw_text)
+            compliance_result = check_compliance(listing)
+            cost_estimate = estimate_cost(usage)
+
+        status = "REVIEW_REQUIRED" if not compliance_result["compliant"] else "OK"
+
+        return {
+            "product_id": product_id,
+            "product_name": payload["product_name"],
+            "price": float(payload["price"]),
+            "category": payload["category"],
+            "image_path": image_path,
+            "status": status,
+            "cost_estimate": cost_estimate,
+            "listing": listing,
+            "compliance": compliance_result,
+        }
+
+    except Exception as e:
+        return {
+            "status": "FAILED",
+            "error": str(e),
+            "payload": payload,
+        }
+
+def process_product_request(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Process ONE validated JSON request.
+
+    ROLE (Lab M1.06):
+    Allows the system to accept structured JSON input instead of pandas rows.
+    Reuses the existing generation pipeline safely.
+    """
+
+    try:
+        # Convert payload into a pandas-like structure
+        row = pd.Series({
+            "product_id": payload["product_id"],
+            "name": payload["product_name"],
+            "price": payload["price"],
+            "category": payload["category"],
+            "image_path": payload["image_path"],
+            "additional_info": payload.get("additional_info"),
+        })
+
+        # Reuse existing pipeline
+        return process_one_product(row)
+
+    except Exception as e:
+        return {
+            "status": "FAILED",
+            "error": str(e),
+            "payload": payload,
         }
 
 # ---------------------------------------------------
